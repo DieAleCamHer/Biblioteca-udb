@@ -4,141 +4,191 @@
 
 @section('content')
 <div class="row">
-    <div class="col-md-8 offset-md-2">
-        <div class="card shadow-sm">
+    <div class="col-md-10 offset-md-1">
+        <div class="card">
             <div class="card-header bg-success text-white">
                 <h4 class="mb-0"><i class="bi bi-plus-circle-fill"></i> Registrar Nuevo Préstamo</h4>
             </div>
             <div class="card-body">
-                @if($libros->count() === 0)
-                    <div class="alert alert-warning">
-                        <i class="bi bi-exclamation-triangle-fill"></i>
-                        <strong>No hay libros disponibles.</strong> 
-                        Todos los libros están agotados o no hay libros registrados.
-                        <br>
-                        <a href="{{ route('libros.index') }}" class="alert-link">Ver listado de libros</a>
+                <form action="{{ route('prestamos.store') }}" method="POST" id="formPrestamo">
+                    @csrf
+
+                    {{-- Seleccionar Libro --}}
+                    <div class="mb-4">
+                        <label for="libro_id" class="form-label">
+                            Libro a Prestar <span class="text-danger">*</span>
+                        </label>
+                        <select name="libro_id" 
+                                id="libro_id" 
+                                class="form-select @error('libro_id') is-invalid @enderror"
+                                required>
+                            <option value="">Seleccione un libro</option>
+                            @foreach($libros as $libro)
+                                <option value="{{ $libro->id }}" {{ old('libro_id') == $libro->id ? 'selected' : '' }}>
+                                    {{ $libro->titulo }} - {{ $libro->autor }} 
+                                    (Stock: {{ $libro->stock }})
+                                </option>
+                            @endforeach
+                        </select>
+                        @error('libro_id')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                        @enderror
                     </div>
-                @else
-                    <!-- Información de fecha automática -->
-                    <div class="alert alert-info">
-                        <i class="bi bi-info-circle-fill"></i>
-                        <strong>Información:</strong> El préstamo se registrará con la fecha y hora actual del sistema.
-                        <br>
-                        <strong>Fecha límite:</strong> Se calculará automáticamente 7 días después del préstamo.
+
+                    <hr>
+
+                    {{-- Opción: Estudiante Existente o Nuevo --}}
+                    <div class="mb-4">
+                        <label class="form-label">
+                            Estudiante <span class="text-danger">*</span>
+                        </label>
+                        <div class="btn-group w-100" role="group">
+                            <input type="radio" 
+                                   class="btn-check" 
+                                   name="opcion_estudiante" 
+                                   id="opcion_existente" 
+                                   value="existente" 
+                                   {{ old('opcion_estudiante', 'existente') == 'existente' ? 'checked' : '' }}>
+                            <label class="btn btn-outline-primary" for="opcion_existente">
+                                <i class="bi bi-person-check-fill"></i> Estudiante Registrado
+                            </label>
+
+                            <input type="radio" 
+                                   class="btn-check" 
+                                   name="opcion_estudiante" 
+                                   id="opcion_nuevo" 
+                                   value="nuevo"
+                                   {{ old('opcion_estudiante') == 'nuevo' ? 'checked' : '' }}>
+                            <label class="btn btn-outline-success" for="opcion_nuevo">
+                                <i class="bi bi-person-plus-fill"></i> Nuevo Estudiante
+                            </label>
+                        </div>
+                        @error('opcion_estudiante')
+                            <div class="text-danger small mt-1">{{ $message }}</div>
+                        @enderror
                     </div>
 
-                    <form action="{{ route('prestamos.store') }}" method="POST" id="formPrestamo">
-                        @csrf
-
-                        <!-- Libro -->
-                        <div class="mb-3">
-                            <label for="libro_id" class="form-label">
-                                Seleccione el Libro <span class="text-danger">*</span>
-                            </label>
-                            <select name="libro_id" 
-                                    id="libro_id" 
-                                    class="form-select @error('libro_id') is-invalid @enderror"
-                                    required>
-                                <option value="">-- Seleccione un libro --</option>
-                                @foreach($libros as $libro)
-                                    <option value="{{ $libro->id }}" 
-                                            data-stock="{{ $libro->stock }}"
-                                            {{ old('libro_id') == $libro->id ? 'selected' : '' }}>
-                                        {{ $libro->titulo }} - {{ $libro->autor }} 
-                                        (Stock: {{ $libro->stock }})
-                                    </option>
-                                @endforeach
-                            </select>
-                            <small class="form-text text-muted">
-                                Solo se muestran libros con stock disponible.
-                            </small>
-                            @error('libro_id')
-                                <div class="invalid-feedback">{{ $message }}</div>
-                            @enderror
-                        </div>
-
-                        <!-- Información del Stock -->
-                        <div id="stockInfo" class="alert alert-info d-none">
-                            <i class="bi bi-info-circle-fill"></i>
-                            <strong>Stock disponible:</strong> <span id="stockValue">-</span> unidad(es)
-                        </div>
-
-                        <!-- Nombre del Estudiante -->
-                        <div class="mb-3">
-                            <label for="nombre_estudiante" class="form-label">
-                                Nombre del Estudiante <span class="text-danger">*</span>
-                            </label>
-                            <input type="text" 
-                                   name="nombre_estudiante" 
-                                   id="nombre_estudiante" 
-                                   class="form-control @error('nombre_estudiante') is-invalid @enderror"
-                                   value="{{ old('nombre_estudiante') }}"
-                                   maxlength="150"
-                                   placeholder="Ej: Juan Pérez González"
-                                   pattern="[a-záéíóúñA-ZÁÉÍÓÚÑ\s]+"
-                                   required>
-                            <small class="form-text text-muted">
-                                Solo letras y espacios (sin números).
-                            </small>
-                            @error('nombre_estudiante')
-                                <div class="invalid-feedback">{{ $message }}</div>
-                            @enderror
-                        </div>
-
-                        <!-- Carnet del Estudiante -->
-                        <div class="mb-3">
-                            <label for="carnet_estudiante" class="form-label">
-                                Carnet del Estudiante <span class="text-danger">*</span>
-                            </label>
-                            <input type="text" 
-                                   name="carnet_estudiante" 
-                                   id="carnet_estudiante" 
-                                   class="form-control @error('carnet_estudiante') is-invalid @enderror"
-                                   value="{{ old('carnet_estudiante') }}"
-                                   maxlength="8"
-                                   placeholder="Ej: CH252968 o MD259867"
-                                   pattern="[A-Z]{2}[0-9]{6}"
-                                   style="text-transform: uppercase;"
-                                   required>
-                            <small class="form-text text-muted">
-                                Formato: 2 letras mayúsculas + 6 números (Ej: CH252968, MD259867)
-                            </small>
-                            @error('carnet_estudiante')
-                                <div class="invalid-feedback">{{ $message }}</div>
-                            @enderror
-                        </div>
-
-                        <!-- Información de Fechas (No editable, solo informativa) -->
-                        <div class="mb-3">
-                            <div class="card bg-light">
-                                <div class="card-body">
-                                    <h6 class="card-title"><i class="bi bi-calendar-check-fill"></i> Información del Préstamo</h6>
-                                    <p class="mb-1">
-                                        <strong>Fecha y hora del préstamo:</strong> 
-                                        <span id="fechaActual"></span>
-                                    </p>
-                                    <p class="mb-0">
-                                        <strong>Fecha límite de devolución:</strong> 
-                                        <span id="fechaLimite"></span>
-                                        <small class="text-muted">(7 días después)</small>
-                                    </p>
+                    {{-- Panel: Estudiante Existente --}}
+                    <div id="panel_existente" style="display: none;">
+                        <div class="card mb-4">
+                            <div class="card-header bg-primary text-white">
+                                Seleccionar Estudiante Registrado
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <label for="estudiante_id" class="form-label">Estudiante</label>
+                                    <select name="estudiante_id" 
+                                            id="estudiante_id" 
+                                            class="form-select @error('estudiante_id') is-invalid @enderror">
+                                        <option value="">Seleccione un estudiante</option>
+                                        @foreach($estudiantes as $estudiante)
+                                            <option value="{{ $estudiante->id }}" {{ old('estudiante_id') == $estudiante->id ? 'selected' : '' }}>
+                                                {{ $estudiante->carnet }} - {{ $estudiante->nombre }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                    @error('estudiante_id')
+                                        <div class="invalid-feedback">{{ $message }}</div>
+                                    @enderror
                                 </div>
                             </div>
                         </div>
+                    </div>
 
-                        <hr>
+                    {{-- Panel: Nuevo Estudiante --}}
+                    <div id="panel_nuevo" style="display: none;">
+                        <div class="card mb-4">
+                            <div class="card-header bg-success text-white">
+                                Registrar Nuevo Estudiante
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label for="nuevo_carnet" class="form-label">
+                                            Carnet <span class="text-danger">*</span>
+                                        </label>
+                                        <input type="text" 
+                                               name="nuevo_carnet" 
+                                               id="nuevo_carnet" 
+                                               class="form-control @error('nuevo_carnet') is-invalid @enderror"
+                                               value="{{ old('nuevo_carnet') }}"
+                                               placeholder="Ej: CH252968"
+                                               maxlength="8">
+                                        <small class="form-text text-muted">
+                                            Formato: 2 letras + 6 números (Ej: CH252968, MD259867)
+                                        </small>
+                                        @error('nuevo_carnet')
+                                            <div class="invalid-feedback">{{ $message }}</div>
+                                        @enderror
+                                    </div>
 
-                        <!-- Botones -->
-                        <div class="d-flex justify-content-between">
-                            <a href="{{ route('prestamos.index') }}" class="btn btn-secondary">
-                                <i class="bi bi-arrow-left"></i> Cancelar
-                            </a>
-                            <button type="submit" class="btn btn-success" id="btnSubmit">
-                                <i class="bi bi-save-fill"></i> Registrar Préstamo
-                            </button>
+                                    <div class="col-md-6 mb-3">
+                                        <label for="nuevo_nombre" class="form-label">
+                                            Nombre Completo <span class="text-danger">*</span>
+                                        </label>
+                                        <input type="text" 
+                                               name="nuevo_nombre" 
+                                               id="nuevo_nombre" 
+                                               class="form-control @error('nuevo_nombre') is-invalid @enderror"
+                                               value="{{ old('nuevo_nombre') }}"
+                                               maxlength="150">
+                                        @error('nuevo_nombre')
+                                            <div class="invalid-feedback">{{ $message }}</div>
+                                        @enderror
+                                    </div>
+
+                                    <div class="col-md-6 mb-3">
+                                        <label for="nuevo_email" class="form-label">Email (Opcional)</label>
+                                        <input type="email" 
+                                               name="nuevo_email" 
+                                               id="nuevo_email" 
+                                               class="form-control @error('nuevo_email') is-invalid @enderror"
+                                               value="{{ old('nuevo_email') }}">
+                                        @error('nuevo_email')
+                                            <div class="invalid-feedback">{{ $message }}</div>
+                                        @enderror
+                                    </div>
+
+                                    <div class="col-md-6 mb-3">
+                                        <label for="nuevo_telefono" class="form-label">Teléfono (Opcional)</label>
+                                        <input type="text" 
+                                               name="nuevo_telefono" 
+                                               id="nuevo_telefono" 
+                                               class="form-control @error('nuevo_telefono') is-invalid @enderror"
+                                               value="{{ old('nuevo_telefono') }}"
+                                               placeholder="Ej: 7890-1234">
+                                        @error('nuevo_telefono')
+                                            <div class="invalid-feedback">{{ $message }}</div>
+                                        @enderror
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                    </form>
-                @endif
+                    </div>
+
+                    <hr>
+
+                    {{-- Información del Préstamo --}}
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle-fill"></i>
+                        <strong>Información:</strong>
+                        <ul class="mb-0 mt-2">
+                            <li>El préstamo se registrará con fecha de hoy</li>
+                            <li>Fecha límite de devolución: <strong>{{ now()->addDays(7)->format('d/m/Y') }}</strong> (7 días)</li>
+                            <li>El stock del libro se reducirá automáticamente</li>
+                        </ul>
+                    </div>
+
+                    {{-- Botones --}}
+                    <div class="d-flex justify-content-between">
+                        <a href="{{ route('prestamos.index') }}" class="btn btn-secondary">
+                            <i class="bi bi-arrow-left"></i> Cancelar
+                        </a>
+                        <button type="submit" class="btn btn-success">
+                            <i class="bi bi-save-fill"></i> Registrar Préstamo
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
@@ -147,74 +197,35 @@
 
 @section('scripts')
 <script>
-    // Mostrar fecha y hora actual
-    function actualizarFechas() {
-        const ahora = new Date();
-        const fechaLimite = new Date(ahora);
-        fechaLimite.setDate(fechaLimite.getDate() + 7);
-        
-        const opciones = { 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-        };
-        
-        document.getElementById('fechaActual').textContent = ahora.toLocaleDateString('es-ES', opciones);
-        document.getElementById('fechaLimite').textContent = fechaLimite.toLocaleDateString('es-ES', {
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric'
-        });
-    }
-    
-    actualizarFechas();
-    setInterval(actualizarFechas, 60000); // Actualizar cada minuto
+    // Mostrar/ocultar paneles según opción seleccionada
+    document.addEventListener('DOMContentLoaded', function() {
+        const opcionExistente = document.getElementById('opcion_existente');
+        const opcionNuevo = document.getElementById('opcion_nuevo');
+        const panelExistente = document.getElementById('panel_existente');
+        const panelNuevo = document.getElementById('panel_nuevo');
 
-    // Mostrar stock del libro seleccionado
-    document.getElementById('libro_id').addEventListener('change', function() {
-        const selectedOption = this.options[this.selectedIndex];
-        const stock = selectedOption.getAttribute('data-stock');
-        const stockInfo = document.getElementById('stockInfo');
-        const stockValue = document.getElementById('stockValue');
-        const btnSubmit = document.getElementById('btnSubmit');
-        
-        if (this.value) {
-            stockInfo.classList.remove('d-none');
-            stockValue.textContent = stock;
-            
-            if (parseInt(stock) <= 0) {
-                btnSubmit.disabled = true;
-                stockInfo.classList.remove('alert-info');
-                stockInfo.classList.add('alert-danger');
+        function togglePanels() {
+            if (opcionExistente.checked) {
+                panelExistente.style.display = 'block';
+                panelNuevo.style.display = 'none';
             } else {
-                btnSubmit.disabled = false;
-                stockInfo.classList.remove('alert-danger');
-                stockInfo.classList.add('alert-info');
+                panelExistente.style.display = 'none';
+                panelNuevo.style.display = 'block';
             }
-        } else {
-            stockInfo.classList.add('d-none');
-            btnSubmit.disabled = false;
         }
-    });
 
-    // Validación de nombre (solo letras)
-    document.getElementById('nombre_estudiante').addEventListener('input', function(e) {
-        this.value = this.value.replace(/[^a-záéíóúñA-ZÁÉÍÓÚÑ\s]/g, '');
-    });
+        opcionExistente.addEventListener('change', togglePanels);
+        opcionNuevo.addEventListener('change', togglePanels);
 
-    // Validación y formato de carnet (2 letras + 6 números)
-    document.getElementById('carnet_estudiante').addEventListener('input', function(e) {
-        let valor = this.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
-        
-        // Limitar a 2 letras al inicio
-        if (valor.length > 0) {
-            let letras = valor.substring(0, 2).replace(/[^A-Z]/g, '');
-            let numeros = valor.substring(2).replace(/[^0-9]/g, '').substring(0, 6);
-            this.value = letras + numeros;
-        } else {
-            this.value = '';
+        // Inicializar al cargar
+        togglePanels();
+
+        // Validar formato de carnet en tiempo real
+        const carnetInput = document.getElementById('nuevo_carnet');
+        if (carnetInput) {
+            carnetInput.addEventListener('input', function(e) {
+                this.value = this.value.toUpperCase();
+            });
         }
     });
 </script>

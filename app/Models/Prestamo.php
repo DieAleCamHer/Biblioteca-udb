@@ -12,11 +12,10 @@ class Prestamo extends Model
 
     /**
      * Los atributos que son asignables en masa.
-     *
-     * @var array<int, string>
      */
     protected $fillable = [
         'libro_id',
+        'estudiante_id',
         'nombre_estudiante',
         'carnet_estudiante',
         'fecha_prestamo',
@@ -29,8 +28,6 @@ class Prestamo extends Model
 
     /**
      * Los atributos que deben ser convertidos a fechas.
-     *
-     * @var array<int, string>
      */
     protected $casts = [
         'fecha_prestamo' => 'datetime',
@@ -45,6 +42,14 @@ class Prestamo extends Model
     public function libro()
     {
         return $this->belongsTo(Libro::class);
+    }
+
+    /**
+     * Relación: Un préstamo pertenece a un estudiante
+     */
+    public function estudiante()
+    {
+        return $this->belongsTo(Estudiante::class);
     }
 
     /**
@@ -67,7 +72,6 @@ class Prestamo extends Model
         $fechaDevolucion = Carbon::parse($this->fecha_devolucion);
         $fechaLimite = Carbon::parse($this->fecha_limite);
 
-        // Si se devolvió después de la fecha límite
         if ($fechaDevolucion->greaterThan($fechaLimite)) {
             return $fechaDevolucion->diffInDays($fechaLimite);
         }
@@ -92,7 +96,6 @@ class Prestamo extends Model
             return $this->tiene_retraso ? 'Devuelto con Retraso' : 'Devuelto a Tiempo';
         }
         
-        // Verificar si está vencido pero aún no devuelto
         if ($this->estado === 'activo') {
             $hoy = Carbon::now();
             $fechaLimite = Carbon::parse($this->fecha_limite);
@@ -116,14 +119,29 @@ class Prestamo extends Model
             return $this->tiene_retraso ? 'danger' : 'success';
         }
 
-        // Para préstamos activos
         $hoy = Carbon::now();
         $fechaLimite = Carbon::parse($this->fecha_limite);
 
         if ($hoy->greaterThan($fechaLimite)) {
-            return 'danger'; // Vencido
+            return 'danger';
         }
 
-        return 'warning'; // Activo
+        return 'warning';
+    }
+
+    /**
+     * Obtener nombre del estudiante (desde relación o campo legacy)
+     */
+    public function getNombreEstudiante()
+    {
+        return $this->estudiante ? $this->estudiante->nombre : $this->nombre_estudiante;
+    }
+
+    /**
+     * Obtener carnet del estudiante (desde relación o campo legacy)
+     */
+    public function getCarnetEstudiante()
+    {
+        return $this->estudiante ? $this->estudiante->carnet : $this->carnet_estudiante;
     }
 }

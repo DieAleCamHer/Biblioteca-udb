@@ -1,8 +1,8 @@
 <?php
 
-use Illuminate\Database\Migrations\Migration; // Clase base
-use Illuminate\Database\Schema\Blueprint; // Constructorde tablas
-use Illuminate\Support\Facades\Schema; // Facade para manejar la base de datos
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('libros', function (Blueprint $table) {
-            $table->year('anio_publicacion')->after('isbn');
+            $table->boolean('activo')->default(true)->after('stock');
         });
     }
 
@@ -22,7 +22,7 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('libros', function (Blueprint $table) {
-            $table->dropColumn('anio_publicacion');
+            $table->dropColumn('activo');
         });
     }
 };

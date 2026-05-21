@@ -5,7 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
-class Libro extends Model
+class Estudiante extends Model
 {
     use HasFactory;
 
@@ -13,12 +13,10 @@ class Libro extends Model
      * Los atributos que son asignables en masa.
      */
     protected $fillable = [
-        'categoria_id',
-        'titulo',
-        'autor',
-        'isbn',
-        'anio_publicacion',
-        'stock',
+        'carnet',
+        'nombre',
+        'email',
+        'telefono',
         'activo',
     ];
 
@@ -30,15 +28,7 @@ class Libro extends Model
     ];
 
     /**
-     * Relación: Un libro pertenece a una categoría
-     */
-    public function categoria()
-    {
-        return $this->belongsTo(Categoria::class);
-    }
-
-    /**
-     * Relación: Un libro tiene muchos préstamos
+     * Relación: Un estudiante tiene muchos préstamos
      */
     public function prestamos()
     {
@@ -46,7 +36,7 @@ class Libro extends Model
     }
 
     /**
-     * Obtener cantidad de préstamos activos
+     * Obtener préstamos activos
      */
     public function prestamosActivos()
     {
@@ -54,7 +44,7 @@ class Libro extends Model
     }
 
     /**
-     * Scope para filtrar solo libros activos
+     * Scope para filtrar solo estudiantes activos
      */
     public function scopeActivos($query)
     {
@@ -62,19 +52,11 @@ class Libro extends Model
     }
 
     /**
-     * Verificar si el libro está activo
+     * Verificar si el estudiante está activo
      */
     public function estaActivo()
     {
         return $this->activo;
-    }
-
-    /**
-     * Verificar si el libro está disponible (activo y con stock)
-     */
-    public function estaDisponible()
-    {
-        return $this->activo && $this->stock > 0;
     }
 
     /**
@@ -86,7 +68,7 @@ class Libro extends Model
     }
 
     /**
-     * Activar libro
+     * Activar estudiante
      */
     public function activar()
     {
@@ -94,7 +76,7 @@ class Libro extends Model
     }
 
     /**
-     * Desactivar libro
+     * Desactivar estudiante
      */
     public function desactivar()
     {

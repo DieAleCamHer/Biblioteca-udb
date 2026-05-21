@@ -1,8 +1,9 @@
+<!-- Hereda el layout principal (layouts/app.blade.php  El layout tiene el navbar, footer... -->
 @extends('layouts.app')
 
 @section('title', 'Listado de Libros')
 
-@section('content')
+@section('content') <!-- Define el contenido de esta pagina; va dentro del @yield('content') del layout -->
 <div class="row mb-4">
     <div class="col-md-6">
         <h1>
@@ -69,6 +70,7 @@
                         </tr>
                     </thead>
                     <tbody>
+                        <!-- Loop sobre libros -->
                         @foreach($libros as $libro)
                             <tr>
                                 <td>{{ $libro->id }}</td>
@@ -77,6 +79,7 @@
                                 <td><code>{{ $libro->isbn }}</code></td>
                                 <td>{{ $libro->anio_publicacion }}</td>
                                 <td>
+                                    <!-- Accede a la relacion; gracias a with('categoria') ya esta cargada -->
                                     <span class="badge bg-info">{{ $libro->categoria->nombre }}</span>
                                 </td>
                                 <td>
@@ -117,6 +120,7 @@
 
     <!-- Paginación -->
     <div class="mt-3">
+        <!-- Genera los botones de paginacion automaticamente-->
         {{ $libros->appends(request()->query())->links() }}
     </div>
 @else

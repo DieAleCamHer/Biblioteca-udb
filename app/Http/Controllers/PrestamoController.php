@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\StorePrestamoRequest;
 use App\Models\Prestamo;
 use App\Models\Libro;
+use App\Models\Estudiante;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
@@ -16,10 +17,10 @@ class PrestamoController extends Controller
      */
     public function index()
     {
-        $prestamos = Prestamo::with(['libro.categoria'])
+        $prestamos = Prestamo::with(['libro.categoria', 'estudiante'])
             ->orderBy('created_at', 'desc')
             ->paginate(15);
-        
+
         return view('prestamos.index', compact('prestamos'));
     }
 
@@ -28,129 +29,190 @@ class PrestamoController extends Controller
      */
     public function create()
     {
-        // Solo mostrar libros con stock disponible
-        $libros = Libro::where('stock', '>', 0)
-            ->with('categoria')
+        // Solo libros activos y con stock
+        $libros = Libro::activos()
+            ->where('stock', '>', 0)
             ->orderBy('titulo')
             ->get();
-        
-        return view('prestamos.create', compact('libros'));
+
+        // Solo estudiantes activos
+        $estudiantes = Estudiante::activos()
+            ->orderBy('nombre')
+            ->get();
+
+        return view('prestamos.create', compact('libros', 'estudiantes'));
     }
 
     /**
      * Store a newly created resource in storage.
      */
-    public function store(StorePrestamoRequest $request)
+    public function store(Request $request)
     {
-        // Usar transacción para garantizar integridad
+        // Validación
+        $validated = $request->validate([
+            'libro_id' => 'required|exists:libros,id',
+            'opcion_estudiante' => 'required|in:existente,nuevo',
+            
+            // Si selecciona estudiante existente
+            'estudiante_id' => 'required_if:opcion_estudiante,existente|nullable|exists:estudiantes,id',
+            
+            // Si crea nuevo estudiante
+            'nuevo_carnet' => [
+                'required_if:opcion_estudiante,nuevo',
+                'nullable',
+                'regex:/^[A-Z]{2}\d{6}$/',
+                'unique:estudiantes,carnet',
+            ],
+            'nuevo_nombre' => [
+                'required_if:opcion_estudiante,nuevo',
+                'nullable',
+                'string',
+                'max:150',
+                'regex:/^[a-záéíóúñA-ZÁÉÍÓÚÑ\s]+$/',
+            ],
+            'nuevo_email' => 'nullable|email|max:100',
+            'nuevo_telefono' => 'nullable|string|max:15',
+        ], [
+            'libro_id.required' => 'Debe seleccionar un libro.',
+            'libro_id.exists' => 'El libro seleccionado no existe.',
+            'opcion_estudiante.required' => 'Debe seleccionar una opción de estudiante.',
+            'estudiante_id.required_if' => 'Debe seleccionar un estudiante.',
+            'nuevo_carnet.required_if' => 'El carnet es obligatorio.',
+            'nuevo_carnet.regex' => 'El carnet debe tener el formato: 2 letras + 6 números (Ej: CH252968).',
+            'nuevo_carnet.unique' => 'Este carnet ya está registrado.',
+            'nuevo_nombre.required_if' => 'El nombre es obligatorio.',
+            'nuevo_nombre.regex' => 'El nombre solo puede contener letras y espacios.',
+        ]);
+
         DB::beginTransaction();
-        
+
         try {
             $libro = Libro::findOrFail($request->libro_id);
-            
-            // VALIDACIÓN CRÍTICA: Verificar stock disponible
+
+            // Validar que el libro esté activo y disponible
+            if (!$libro->estaActivo()) {
+                return back()
+                    ->withErrors(['libro_id' => 'El libro seleccionado está desactivado.'])
+                    ->withInput();
+            }
+
             if (!$libro->estaDisponible()) {
-                DB::rollBack();
                 return back()
                     ->withErrors(['libro_id' => 'El libro seleccionado no tiene stock disponible.'])
                     ->withInput();
             }
-            
-            // Calcular fecha límite (7 días después del préstamo)
-            $fechaPrestamo = now();
-            $fechaLimite = Carbon::parse($fechaPrestamo)->addDays(7);
-            
-            // Crear el préstamo
+
+            // Crear o seleccionar estudiante
+            if ($request->opcion_estudiante === 'nuevo') {
+                // Crear nuevo estudiante
+                $estudiante = Estudiante::create([
+                    'carnet' => strtoupper($request->nuevo_carnet),
+                    'nombre' => $request->nuevo_nombre,
+                    'email' => $request->nuevo_email,
+                    'telefono' => $request->nuevo_telefono,
+                    'activo' => true,
+                ]);
+                
+                $estudianteId = $estudiante->id;
+                $nombreEstudiante = $estudiante->nombre;
+                $carnetEstudiante = $estudiante->carnet;
+            } else {
+                // Usar estudiante existente
+                $estudiante = Estudiante::findOrFail($request->estudiante_id);
+                
+                if (!$estudiante->estaActivo()) {
+                    return back()
+                        ->withErrors(['estudiante_id' => 'El estudiante seleccionado está desactivado.'])
+                        ->withInput();
+                }
+                
+                $estudianteId = $estudiante->id;
+                $nombreEstudiante = $estudiante->nombre;
+                $carnetEstudiante = $estudiante->carnet;
+            }
+
+            // Crear préstamo
+            $fechaPrestamo = Carbon::now();
+            $fechaLimite = Carbon::now()->addDays(7);
+
             $prestamo = Prestamo::create([
-                'libro_id' => $request->libro_id,
-                'nombre_estudiante' => $request->nombre_estudiante,
-                'carnet_estudiante' => strtoupper($request->carnet_estudiante), // Convertir a mayúsculas
+                'libro_id' => $libro->id,
+                'estudiante_id' => $estudianteId,
+                'nombre_estudiante' => $nombreEstudiante,
+                'carnet_estudiante' => $carnetEstudiante,
                 'fecha_prestamo' => $fechaPrestamo,
                 'fecha_limite' => $fechaLimite,
                 'estado' => 'activo',
-                'dias_retraso' => 0,
-                'tiene_retraso' => false,
             ]);
-            
-            // Decrementar el stock del libro
+
+            // Reducir stock
             $libro->decrement('stock');
-            
+
             DB::commit();
-            
+
             return redirect()
                 ->route('prestamos.index')
-                ->with('success', "Préstamo registrado exitosamente. Fecha límite de devolución: {$fechaLimite->format('d/m/Y')}");
-                
+                ->with('success', 'Préstamo registrado exitosamente.');
+
         } catch (\Exception $e) {
             DB::rollBack();
-            
+
             return back()
-                ->withErrors(['error' => 'Error al procesar el préstamo: ' . $e->getMessage()])
+                ->with('error', 'Error al registrar el préstamo: ' . $e->getMessage())
                 ->withInput();
         }
     }
 
     /**
-     * Devolver un libro prestado.
+     * Registrar devolución de préstamo
      */
-    public function devolver(string $id)
+    public function devolver(Prestamo $prestamo)
     {
+        if ($prestamo->estado !== 'activo') {
+            return back()
+                ->with('error', 'Este préstamo ya fue devuelto.');
+        }
+
         DB::beginTransaction();
-        
+
         try {
-            $prestamo = Prestamo::with('libro')->findOrFail($id);
+            $fechaDevolucion = Carbon::now();
             
-            // Validar que el préstamo esté activo
-            if (!$prestamo->estaActivo()) {
-                DB::rollBack();
-                return back()
-                    ->withErrors(['error' => 'Este préstamo ya fue devuelto anteriormente.']);
-            }
-            
-            // Registrar fecha y hora actual de devolución
-            $fechaDevolucion = now();
-            
-            // Calcular días de retraso
+            // Calcular retraso
             $diasRetraso = 0;
             $tieneRetraso = false;
-            
+
             if ($fechaDevolucion->greaterThan($prestamo->fecha_limite)) {
                 $diasRetraso = $fechaDevolucion->diffInDays($prestamo->fecha_limite);
                 $tieneRetraso = true;
             }
-            
-            // Marcar como devuelto
+
+            // Actualizar préstamo
             $prestamo->update([
-                'estado' => 'devuelto',
                 'fecha_devolucion' => $fechaDevolucion,
                 'dias_retraso' => $diasRetraso,
                 'tiene_retraso' => $tieneRetraso,
+                'estado' => 'devuelto',
             ]);
-            
-            // Incrementar el stock del libro
+
+            // Incrementar stock
             $prestamo->libro->increment('stock');
-            
+
             DB::commit();
-            
-            $mensaje = 'Libro devuelto exitosamente.';
-            
-            if ($tieneRetraso) {
-                $mensaje .= " El libro se devolvió con {$diasRetraso} día(s) de retraso.";
-                return redirect()
-                    ->route('prestamos.index')
-                    ->with('warning', $mensaje);
-            }
-            
-            $mensaje .= " El libro se devolvió a tiempo.";
+
+            $mensaje = $tieneRetraso 
+                ? "Préstamo devuelto con {$diasRetraso} día(s) de retraso."
+                : 'Préstamo devuelto a tiempo.';
+
             return redirect()
                 ->route('prestamos.index')
                 ->with('success', $mensaje);
-                
+
         } catch (\Exception $e) {
             DB::rollBack();
-            
+
             return back()
-                ->withErrors(['error' => 'Error al procesar la devolución: ' . $e->getMessage()]);
+                ->with('error', 'Error al registrar la devolución: ' . $e->getMessage());
         }
     }
 }
