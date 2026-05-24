@@ -1,12 +1,12 @@
 @extends('layouts.app')
 
-@section('title', 'Detalle del Libro')
+@section('title', 'Detalle del Estudiante')
 
 @section('content')
 <div class="row mb-3">
     <div class="col-12">
-        <a href="{{ route('libros.index') }}" class="btn btn-secondary">
-            <i class="bi bi-arrow-left"></i> Volver
+        <a href="{{ route('estudiantes.index') }}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Volver al Listado
         </a>
     </div>
 </div>
@@ -15,49 +15,35 @@
     <div class="col-md-6">
         <div class="card mb-4">
             <div class="card-header bg-info text-white">
-                <h4 class="mb-0"><i class="bi bi-book-fill"></i> Información del Libro</h4>
+                <h4 class="mb-0"><i class="bi bi-person-fill"></i> Información del Estudiante</h4>
             </div>
             <div class="card-body">
                 <table class="table table-borderless">
                     <tbody>
                         <tr>
                             <th width="40%">ID:</th>
-                            <td>{{ $libro->id }}</td>
+                            <td>{{ $estudiante->id }}</td>
                         </tr>
                         <tr>
-                            <th>Título:</th>
-                            <td><strong>{{ $libro->titulo }}</strong></td>
+                            <th>Carnet:</th>
+                            <td><code class="fs-5">{{ $estudiante->carnet }}</code></td>
                         </tr>
                         <tr>
-                            <th>Autor:</th>
-                            <td>{{ $libro->autor }}</td>
+                            <th>Nombre:</th>
+                            <td><strong>{{ $estudiante->nombre }}</strong></td>
                         </tr>
                         <tr>
-                            <th>ISBN:</th>
-                            <td><code>{{ $libro->isbn }}</code></td>
+                            <th>Email:</th>
+                            <td>{{ $estudiante->email ?? '-' }}</td>
                         </tr>
                         <tr>
-                            <th>Año de Publicación:</th>
-                            <td><strong>{{ $libro->anio_publicacion }}</strong></td>
-                        </tr>
-                        <tr>
-                            <th>Categoría:</th>
-                            <td><span class="badge bg-info">{{ $libro->categoria->nombre }}</span></td>
-                        </tr>
-                        <tr>
-                            <th>Stock Disponible:</th>
-                            <td>
-                                @if($libro->stock > 0)
-                                    <span class="badge bg-success fs-6">{{ $libro->stock }}</span>
-                                @else
-                                    <span class="badge bg-danger fs-6">0</span>
-                                @endif
-                            </td>
+                            <th>Teléfono:</th>
+                            <td>{{ $estudiante->telefono ?? '-' }}</td>
                         </tr>
                         <tr>
                             <th>Estado:</th>
                             <td>
-                                @if($libro->activo)
+                                @if($estudiante->activo)
                                     <span class="badge bg-success fs-6">Activo</span>
                                 @else
                                     <span class="badge bg-danger fs-6">Inactivo</span>
@@ -66,11 +52,11 @@
                         </tr>
                         <tr>
                             <th>Fecha de Registro:</th>
-                            <td>{{ $libro->created_at->format('d/m/Y H:i') }}</td>
+                            <td>{{ $estudiante->created_at->format('d/m/Y H:i') }}</td>
                         </tr>
                         <tr>
                             <th>Última Actualización:</th>
-                            <td>{{ $libro->updated_at->format('d/m/Y H:i') }}</td>
+                            <td>{{ $estudiante->updated_at->format('d/m/Y H:i') }}</td>
                         </tr>
                     </tbody>
                 </table>
@@ -78,31 +64,32 @@
                 <hr>
 
                 <div class="d-flex gap-2">
-                    <a href="{{ route('libros.edit', $libro->id) }}" class="btn btn-warning">
+                    <a href="{{ route('estudiantes.edit', $estudiante->id) }}" class="btn btn-warning">
                         <i class="bi bi-pencil-fill"></i> Editar
                     </a>
                     
-                    @if($libro->activo)
-                        <button type="button" class="btn btn-secondary" 
-                                data-bs-toggle="modal" 
-                                data-bs-target="#desactivarModal">
-                            <i class="bi bi-x-circle-fill"></i> Desactivar
-                        </button>
+                    @if($estudiante->activo)
+                        @if($estudiante->puedeDesactivar())
+                            <form action="{{ route('estudiantes.desactivar', $estudiante->id) }}" 
+                                  method="POST" 
+                                  onsubmit="return confirm('¿Desactivar este estudiante?')">
+                                @csrf
+                                <button type="submit" class="btn btn-secondary">
+                                    <i class="bi bi-x-circle-fill"></i> Desactivar
+                                </button>
+                            </form>
+                        @else
+                            <button class="btn btn-secondary" disabled title="Tiene préstamos activos">
+                                <i class="bi bi-x-circle-fill"></i> Desactivar (Bloqueado)
+                            </button>
+                        @endif
                     @else
-                        <form action="{{ route('libros.activar', $libro->id) }}" method="POST">
+                        <form action="{{ route('estudiantes.activar', $estudiante->id) }}" method="POST">
                             @csrf
                             <button type="submit" class="btn btn-success">
                                 <i class="bi bi-check-circle-fill"></i> Activar
                             </button>
                         </form>
-                    @endif
-                    
-                    @if($libro->puedeEliminar())
-                        <button type="button" class="btn btn-danger" 
-                                data-bs-toggle="modal" 
-                                data-bs-target="#deleteModal">
-                            <i class="bi bi-trash-fill"></i> Eliminar
-                        </button>
                     @endif
                 </div>
             </div>
@@ -117,7 +104,7 @@
             <div class="card-body">
                 <div class="mb-3">
                     <strong>Total de Préstamos:</strong>
-                    <h3 class="text-primary">{{ $libro->prestamos->count() }}</h3>
+                    <h3 class="text-primary">{{ $estudiante->prestamos->count() }}</h3>
                 </div>
                 <div class="mb-3">
                     <strong>Préstamos Activos:</strong>
@@ -125,13 +112,14 @@
                 </div>
                 <div>
                     <strong>Préstamos Devueltos:</strong>
-                    <h3 class="text-success">{{ $libro->prestamos->where('estado', 'devuelto')->count() }}</h3>
+                    <h3 class="text-success">{{ $estudiante->prestamos->where('estado', 'devuelto')->count() }}</h3>
                 </div>
             </div>
         </div>
     </div>
 </div>
 
+{{-- Historial de Préstamos --}}
 <div class="row">
     <div class="col-12">
         <div class="card">
@@ -139,14 +127,13 @@
                 <h5 class="mb-0"><i class="bi bi-clock-history"></i> Historial de Préstamos</h5>
             </div>
             <div class="card-body">
-                @if($libro->prestamos->count() > 0)
+                @if($estudiante->prestamos->count() > 0)
                     <div class="table-responsive">
                         <table class="table table-hover">
                             <thead class="table-light">
                                 <tr>
                                     <th>ID</th>
-                                    <th>Estudiante</th>
-                                    <th>Carnet</th>
+                                    <th>Libro</th>
                                     <th>Fecha Préstamo</th>
                                     <th>Fecha Límite</th>
                                     <th>Fecha Devolución</th>
@@ -154,11 +141,13 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                @foreach($libro->prestamos as $prestamo)
+                                @foreach($estudiante->prestamos as $prestamo)
                                     <tr>
                                         <td>{{ $prestamo->id }}</td>
-                                        <td>{{ $prestamo->nombre_estudiante }}</td>
-                                        <td><code>{{ $prestamo->carnet_estudiante }}</code></td>
+                                        <td>
+                                            <strong>{{ $prestamo->libro->titulo }}</strong><br>
+                                            <small class="text-muted">{{ $prestamo->libro->autor }}</small>
+                                        </td>
                                         <td>{{ $prestamo->fecha_prestamo->format('d/m/Y H:i') }}</td>
                                         <td>
                                             @if($prestamo->fecha_limite)
@@ -172,6 +161,7 @@
                                                 {{ $prestamo->fecha_devolucion->format('d/m/Y H:i') }}
                                                 @if($prestamo->tiene_retraso)
                                                     <br><small class="text-danger">
+                                                        <i class="bi bi-exclamation-triangle-fill"></i> 
                                                         {{ $prestamo->dias_retraso }} día(s) de retraso
                                                     </small>
                                                 @endif
@@ -190,66 +180,10 @@
                         </table>
                     </div>
                 @else
-                    <p class="text-muted mb-0">No hay préstamos registrados.</p>
+                    <p class="text-muted mb-0">Este estudiante no tiene préstamos registrados.</p>
                 @endif
             </div>
         </div>
     </div>
 </div>
-
-{{-- Modal Desactivar --}}
-@if($libro->activo)
-<div class="modal fade" id="desactivarModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header bg-warning text-dark">
-                <h5 class="modal-title">Confirmar Desactivación</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <p>¿Está seguro que desea desactivar este libro?</p>
-                <div class="alert alert-warning mb-0">
-                    <strong>{{ $libro->titulo }}</strong>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <form action="{{ route('libros.desactivar', $libro->id) }}" method="POST">
-                    @csrf
-                    <button type="submit" class="btn btn-warning">Desactivar</button>
-                </form>
-            </div>
-        </div>
-    </div>
-</div>
-@endif
-
-{{-- Modal Eliminar --}}
-@if($libro->puedeEliminar())
-<div class="modal fade" id="deleteModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header bg-danger text-white">
-                <h5 class="modal-title">Confirmar Eliminación</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <p>¿Está seguro que desea eliminar este libro?</p>
-                <div class="alert alert-warning mb-0">
-                    <strong>{{ $libro->titulo }}</strong><br>
-                    <small>Esta acción no se puede deshacer.</small>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <form action="{{ route('libros.destroy', $libro->id) }}" method="POST">
-                    @csrf
-                    @method('DELETE')
-                    <button type="submit" class="btn btn-danger">Eliminar</button>
-                </form>
-            </div>
-        </div>
-    </div>
-</div>
-@endif
 @endsection

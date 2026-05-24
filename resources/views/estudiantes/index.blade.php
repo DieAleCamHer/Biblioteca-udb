@@ -9,7 +9,7 @@
     </div>
     <div class="col-md-6 text-end">
         <a href="{{ route('estudiantes.create') }}" class="btn btn-success">
-            <i class="bi bi-plus-circle-fill"></i> Registrar Nuevo Estudiante
+            <i class="bi bi-plus-circle"></i> Registrar Nuevo Estudiante
         </a>
     </div>
 </div>

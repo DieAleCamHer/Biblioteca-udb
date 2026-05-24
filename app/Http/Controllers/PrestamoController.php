@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Requests\StorePrestamoRequest;
 use App\Models\Prestamo;
 use App\Models\Libro;
 use App\Models\Estudiante;
@@ -12,9 +11,6 @@ use Carbon\Carbon;
 
 class PrestamoController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
     public function index()
     {
         $prestamos = Prestamo::with(['libro.categoria', 'estudiante'])
@@ -24,39 +20,47 @@ class PrestamoController extends Controller
         return view('prestamos.index', compact('prestamos'));
     }
 
-    /**
-     * Show the form for creating a new resource.
-     */
-    public function create()
+    public function create(Request $request)
     {
-        // Solo libros activos y con stock
-        $libros = Libro::activos()
-            ->where('stock', '>', 0)
-            ->orderBy('titulo')
-            ->get();
+        // BÚSQUEDA DE LIBROS
+        $librosQuery = Libro::activos()->where('stock', '>', 0)->with('categoria');
+        
+        if ($request->filled('buscar_libro')) {
+            $buscar = $request->buscar_libro;
+            $librosQuery->where(function($q) use ($buscar) {
+                $q->where('isbn', 'LIKE', "%{$buscar}%")
+                  ->orWhere('titulo', 'LIKE', "%{$buscar}%")
+                  ->orWhere('autor', 'LIKE', "%{$buscar}%")
+                  ->orWhereHas('categoria', function($query) use ($buscar) {
+                      $query->where('nombre', 'LIKE', "%{$buscar}%");
+                  });
+            });
+        }
+        
+        $libros = $librosQuery->orderBy('titulo')->get();
 
-        // Solo estudiantes activos
-        $estudiantes = Estudiante::activos()
-            ->orderBy('nombre')
-            ->get();
+        // BÚSQUEDA DE ESTUDIANTES
+        $estudiantesQuery = Estudiante::activos();
+        
+        if ($request->filled('buscar_estudiante')) {
+            $buscar = $request->buscar_estudiante;
+            $estudiantesQuery->where(function($q) use ($buscar) {
+                $q->where('carnet', 'LIKE', "%{$buscar}%")
+                  ->orWhere('nombre', 'LIKE', "%{$buscar}%");
+            });
+        }
+        
+        $estudiantes = $estudiantesQuery->orderBy('nombre')->get();
 
         return view('prestamos.create', compact('libros', 'estudiantes'));
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
     public function store(Request $request)
     {
-        // Validación
         $validated = $request->validate([
             'libro_id' => 'required|exists:libros,id',
             'opcion_estudiante' => 'required|in:existente,nuevo',
-            
-            // Si selecciona estudiante existente
             'estudiante_id' => 'required_if:opcion_estudiante,existente|nullable|exists:estudiantes,id',
-            
-            // Si crea nuevo estudiante
             'nuevo_carnet' => [
                 'required_if:opcion_estudiante,nuevo',
                 'nullable',
@@ -70,26 +74,33 @@ class PrestamoController extends Controller
                 'max:150',
                 'regex:/^[a-záéíóúñA-ZÁÉÍÓÚÑ\s]+$/',
             ],
-            'nuevo_email' => 'nullable|email|max:100',
-            'nuevo_telefono' => 'nullable|string|max:15',
+            'nuevo_email' => 'nullable|email:rfc,dns|max:100',
+            'nuevo_telefono' => [
+                'nullable',
+                'string',
+                'regex:/^\d{4}-\d{4}$/',
+            ],
         ], [
             'libro_id.required' => 'Debe seleccionar un libro.',
             'libro_id.exists' => 'El libro seleccionado no existe.',
             'opcion_estudiante.required' => 'Debe seleccionar una opción de estudiante.',
             'estudiante_id.required_if' => 'Debe seleccionar un estudiante.',
+            'estudiante_id.exists' => 'El estudiante seleccionado no existe.',
             'nuevo_carnet.required_if' => 'El carnet es obligatorio.',
-            'nuevo_carnet.regex' => 'El carnet debe tener el formato: 2 letras + 6 números (Ej: CH252968).',
+            'nuevo_carnet.regex' => 'El carnet debe tener el formato: XX123456.',
             'nuevo_carnet.unique' => 'Este carnet ya está registrado.',
             'nuevo_nombre.required_if' => 'El nombre es obligatorio.',
-            'nuevo_nombre.regex' => 'El nombre solo puede contener letras y espacios.',
+            'nuevo_nombre.regex' => 'El nombre solo puede contener letras.',
+            'nuevo_email.email' => 'El email debe ser válido.',
+            'nuevo_telefono.regex' => 'El teléfono debe tener el formato: XXXX-XXXX.',
         ]);
 
         DB::beginTransaction();
 
         try {
+            // Verificar libro
             $libro = Libro::findOrFail($request->libro_id);
 
-            // Validar que el libro esté activo y disponible
             if (!$libro->estaActivo()) {
                 return back()
                     ->withErrors(['libro_id' => 'El libro seleccionado está desactivado.'])
@@ -98,13 +109,12 @@ class PrestamoController extends Controller
 
             if (!$libro->estaDisponible()) {
                 return back()
-                    ->withErrors(['libro_id' => 'El libro seleccionado no tiene stock disponible.'])
+                    ->withErrors(['libro_id' => 'El libro no tiene stock disponible.'])
                     ->withInput();
             }
 
-            // Crear o seleccionar estudiante
+            // Procesar estudiante
             if ($request->opcion_estudiante === 'nuevo') {
-                // Crear nuevo estudiante
                 $estudiante = Estudiante::create([
                     'carnet' => strtoupper($request->nuevo_carnet),
                     'nombre' => $request->nuevo_nombre,
@@ -117,12 +127,11 @@ class PrestamoController extends Controller
                 $nombreEstudiante = $estudiante->nombre;
                 $carnetEstudiante = $estudiante->carnet;
             } else {
-                // Usar estudiante existente
                 $estudiante = Estudiante::findOrFail($request->estudiante_id);
                 
                 if (!$estudiante->estaActivo()) {
                     return back()
-                        ->withErrors(['estudiante_id' => 'El estudiante seleccionado está desactivado.'])
+                        ->withErrors(['estudiante_id' => 'El estudiante está desactivado.'])
                         ->withInput();
                 }
                 
@@ -163,9 +172,6 @@ class PrestamoController extends Controller
         }
     }
 
-    /**
-     * Registrar devolución de préstamo
-     */
     public function devolver(Prestamo $prestamo)
     {
         if ($prestamo->estado !== 'activo') {
@@ -178,7 +184,6 @@ class PrestamoController extends Controller
         try {
             $fechaDevolucion = Carbon::now();
             
-            // Calcular retraso
             $diasRetraso = 0;
             $tieneRetraso = false;
 
@@ -187,7 +192,6 @@ class PrestamoController extends Controller
                 $tieneRetraso = true;
             }
 
-            // Actualizar préstamo
             $prestamo->update([
                 'fecha_devolucion' => $fechaDevolucion,
                 'dias_retraso' => $diasRetraso,
@@ -195,7 +199,6 @@ class PrestamoController extends Controller
                 'estado' => 'devuelto',
             ]);
 
-            // Incrementar stock
             $prestamo->libro->increment('stock');
 
             DB::commit();
@@ -212,7 +215,7 @@ class PrestamoController extends Controller
             DB::rollBack();
 
             return back()
-                ->with('error', 'Error al registrar la devolución: ' . $e->getMessage());
+                ->with('error', 'Error al registrar la devolución.');
         }
     }
 }

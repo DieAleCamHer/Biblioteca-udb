@@ -9,9 +9,6 @@ class Libro extends Model
 {
     use HasFactory;
 
-    /**
-     * Los atributos que son asignables en masa.
-     */
     protected $fillable = [
         'categoria_id',
         'titulo',
@@ -22,80 +19,55 @@ class Libro extends Model
         'activo',
     ];
 
-    /**
-     * Los atributos que deben ser convertidos.
-     */
     protected $casts = [
         'activo' => 'boolean',
     ];
 
-    /**
-     * Relación: Un libro pertenece a una categoría
-     */
     public function categoria()
     {
         return $this->belongsTo(Categoria::class);
     }
 
-    /**
-     * Relación: Un libro tiene muchos préstamos
-     */
     public function prestamos()
     {
         return $this->hasMany(Prestamo::class);
     }
 
-    /**
-     * Obtener cantidad de préstamos activos
-     */
     public function prestamosActivos()
     {
         return $this->prestamos()->where('estado', 'activo');
     }
 
-    /**
-     * Scope para filtrar solo libros activos
-     */
     public function scopeActivos($query)
     {
         return $query->where('activo', true);
     }
 
-    /**
-     * Verificar si el libro está activo
-     */
     public function estaActivo()
     {
         return $this->activo;
     }
 
-    /**
-     * Verificar si el libro está disponible (activo y con stock)
-     */
     public function estaDisponible()
     {
         return $this->activo && $this->stock > 0;
     }
 
-    /**
-     * Verificar si se puede desactivar (no tiene préstamos activos)
-     */
     public function puedeDesactivar()
     {
         return $this->prestamosActivos()->count() === 0;
     }
 
-    /**
-     * Activar libro
-     */
+    public function puedeEliminar()
+    {
+        return $this->prestamos()->count() === 0;
+    }
+
     public function activar()
     {
         $this->update(['activo' => true]);
     }
 
-    /**
-     * Desactivar libro
-     */
     public function desactivar()
     {
         if ($this->puedeDesactivar()) {

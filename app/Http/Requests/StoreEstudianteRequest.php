@@ -6,17 +6,11 @@ use Illuminate\Foundation\Http\FormRequest;
 
 class StoreEstudianteRequest extends FormRequest
 {
-    /**
-     * Determine if the user is authorized to make this request.
-     */
     public function authorize(): bool
     {
         return true;
     }
 
-    /**
-     * Get the validation rules that apply to the request.
-     */
     public function rules(): array
     {
         return [
@@ -32,34 +26,31 @@ class StoreEstudianteRequest extends FormRequest
                 'max:150',
                 'regex:/^[a-záéíóúñA-ZÁÉÍÓÚÑ\s]+$/',
             ],
-            'email' => 'nullable|email|max:100',
-            'telefono' => 'nullable|string|max:15|regex:/^[0-9\-\+\(\)\s]+$/',
+            'email' => 'nullable|email:rfc,dns|max:100',
+            'telefono' => [
+                'nullable',
+                'string',
+                'regex:/^\d{4}-\d{4}$/',
+            ],
         ];
     }
 
-    /**
-     * Get custom messages for validator errors.
-     */
     public function messages(): array
     {
         return [
             'carnet.required' => 'El carnet es obligatorio.',
-            'carnet.regex' => 'El carnet debe tener el formato: 2 letras mayúsculas + 6 números (Ej: CH252968, MD259867).',
+            'carnet.regex' => 'El carnet debe tener el formato: 2 letras mayúsculas + 6 números (Ej: CH252968).',
             'carnet.unique' => 'Este carnet ya está registrado en el sistema.',
             'nombre.required' => 'El nombre es obligatorio.',
-            'nombre.regex' => 'El nombre solo puede contener letras y espacios (sin números).',
+            'nombre.regex' => 'El nombre solo puede contener letras y espacios.',
             'nombre.max' => 'El nombre no puede exceder 150 caracteres.',
             'email.email' => 'El email debe ser una dirección válida.',
-            'telefono.regex' => 'El teléfono solo puede contener números, espacios y caracteres: - + ( )',
+            'telefono.regex' => 'El teléfono debe tener el formato: XXXX-XXXX (Ej: 7890-1234).',
         ];
     }
 
-    /**
-     * Preparar datos antes de validación
-     */
     protected function prepareForValidation()
     {
-        // Convertir carnet a mayúsculas automáticamente
         if ($this->has('carnet')) {
             $this->merge([
                 'carnet' => strtoupper($this->carnet),
